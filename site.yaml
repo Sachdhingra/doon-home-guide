@@ -30,3 +30,14 @@ pillars:
   real-projects: {name: Real projects, blurb: "Doon ke asli gharon ke before/after."}
   seasonal: {name: Festivals & seasons, blurb: "Diwali, shaadi, griha pravesh aur sale season ki planning."}
   home-tips: {name: Home tips, blurb: "Vastu, care, safai aur chhoti-chhoti kaam ki baatein."}
+
+# "Aane wale din" strip on the home page: the next 4 dates from today are shown.
+dates:
+  - {date: 2026-11-06, what: "Dhanteras"}
+  - {date: 2026-11-08, what: "Diwali"}
+  - {date: 2026-11-14, what: "Griha pravesh muhurat"}
+  - {date: 2026-11-21, what: "Shaadi season shuru"}
+  - {date: 2026-12-02, what: "Vivah + griha pravesh muhurat"}
+  - {date: 2026-12-16, what: "Kharmas shuru (lagbhag)"}
+  - {date: 2027-01-14, what: "Makar Sankranti"}
+  - {date: 2027-01-26, what: "Republic Day sale"}

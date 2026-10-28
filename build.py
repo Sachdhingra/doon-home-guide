@@ -30,6 +30,10 @@ import markdown, yaml
 ROOT = Path(__file__).resolve().parent
 IST = dt.timezone(dt.timedelta(hours=5, minutes=30))
 E = html.escape
+WA_ICON = ('<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.3-.4.8-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.9 11.9 0 0 0 4.6 4c1.7.7 2.4.8 3.2.7.5-.1 1.5-.6 1.8-1.2.2-.6.2-1.1.1-1.2l-.5-.3Z"/></svg>')
+LOGO = ('<svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path d="M8 19 20 9l12 10v12a1.5 1.5 0 0 1-1.5 1.5h-21A1.5 1.5 0 0 1 8 31Z" fill="currentColor" opacity=".14"/>'
+        '<path d="M5 18 20 6l15 12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>'
+        '<path d="M16.5 32.5v-8h7v8" fill="none" stroke="var(--brass)" stroke-width="2.4" stroke-linejoin="round"/></svg>')
 
 
 def load_posts():
@@ -58,6 +62,36 @@ class Site:
         self.root = urlparse(self.base).path.rstrip("/")  # "" on a domain, "/repo" on a project site
 
     # ---------- helpers ----------
+    @staticmethod
+    def inr(n):
+        """₹ in Indian grouping: 186056 -> 1,86,056"""
+        s = str(int(n))
+        if len(s) <= 3:
+            return s
+        head, tail = s[:-3], s[-3:]
+        head = re.sub(r"(\d)(?=(\d{2})+$)", r"\1,", head)
+        return f"{head},{tail}"
+
+    def read_min(self, p):
+        return max(1, round(len(p["body"].split()) / 200))
+
+    def cover(self, p):
+        """Photo for cards and the post header: `cover:` product id, else the first product in the post."""
+        pid = p.get("cover")
+        if not pid:
+            m = re.search(r"\[\[products?:([\w-]+)", p["body"])
+            pid = m.group(1) if m else None
+        if not pid or pid not in self.products:
+            return None, None
+        img = Path(self.products[pid]["image"]).name
+        src = ROOT / "data/product-images" / img
+        if not src.exists():
+            return None, None
+        dest = self.out / "assets/products" / img
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dest)
+        return f"/assets/products/{img}", self.products[pid]["name"]
+
     def wa(self, msg):
         return f"https://wa.me/{self.c['whatsapp']}?text={quote(msg)}"
 
@@ -75,7 +109,7 @@ class Site:
             sys.exit(f"Unknown product id {pid}")
         owner = self.c["owner_url"].rstrip("/")
         link = self.utm(f"{owner}/product.html?id={pid}", campaign)
-        price = f"MRP from ₹{p['from']:,}" if p.get("from") else "Price on request"
+        price = f"MRP from <span class=\"num\">₹{self.inr(p['from'])}</span>" if p.get("from") else "Price on request"
         img = Path(p["image"]).name
         src = ROOT / "data/product-images" / img
         if not src.exists():
@@ -84,17 +118,19 @@ class Site:
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(src, dest)
         return (f'<a class="pcard" href="{E(link)}" data-track="hde_product" data-label="{E(pid)}" rel="sponsored">'
-                f'<img src="/assets/products/{E(img)}" alt="{E(p["name"])}" loading="lazy" width="320" height="240">'
-                f'<span class="pcard__name">{E(p["name"])}</span><span class="pcard__price">{price}</span>'
-                f'<span class="pcard__by">Godrej Interio at HDE, Dehradun</span></a>')
+                f'<span class="pcard__img"><img src="/assets/products/{E(img)}" alt="{E(p["name"])}" loading="lazy" width="320" height="240"></span>'
+                f'<span class="pcard__body"><span class="pcard__brand">Godrej Interio</span><span class="pcard__name">{E(p["name"])}</span>'
+                f'<span class="pcard__price">{price}</span><span class="pcard__go">HDE par dekhein <span aria-hidden="true">→</span></span></span></a>')
 
     def cta_box(self, post):
         msg = post.get("whatsapp") or "Hi HDE, kuch poochna hai"
         msg += " (Doon Home Guide)"  # lets the sales team count leads that came from the blog
         text = post.get("cta") or "Sawal hai? HDE ki team WhatsApp par seedha jawab degi."
-        return (f'<aside class="cta"><p>{E(text)}</p>'
-                f'<a class="btn btn--wa" href="{E(self.wa(msg))}" data-track="whatsapp_click" data-label="{E(post["slug"])}" target="_blank" rel="noopener">WhatsApp par poochhein</a>'
-                f'<a class="btn btn--ghost" href="{E(self.c["store_map"])}" data-track="directions_click" data-label="{E(post["slug"])}" target="_blank" rel="noopener">Showroom ka rasta</a></aside>')
+        c = self.c
+        return (f'<aside class="cta"><div class="cta__text"><span class="eyebrow">HDE se poochhein</span><p>{E(text)}</p>'
+                f'<span class="cta__meta">{E(c["store_name"])} · {E(c["store_hours"])}</span></div>'
+                f'<div class="cta__btns"><a class="btn btn--wa" href="{E(self.wa(msg))}" data-track="whatsapp_click" data-label="{E(post["slug"])}" target="_blank" rel="noopener">{WA_ICON}WhatsApp par poochhein</a>'
+                f'<a class="btn btn--line" href="{E(c["store_map"])}" data-track="directions_click" data-label="{E(post["slug"])}" target="_blank" rel="noopener">Showroom ka rasta</a></div></aside>')
 
     def render_body(self, post):
         camp = post["slug"]
@@ -135,7 +171,7 @@ class Site:
                            f"<script>window.dataLayer=window.dataLayer||[];function gtag(){{dataLayer.push(arguments)}}gtag('js',new Date());gtag('config','{g}');</script>\n")
         for j in jsonld or []:
             head_extra += f'<script type="application/ld+json">{json.dumps(j, ensure_ascii=False)}</script>\n'
-        nav = "".join(f'<a href="/topics/{k}/">{E(v["name"])}</a>' for k, v in c["pillars"].items())
+        nav = "".join(f'<a href="/topics/{k}/"{" aria-current=\"page\"" if path == f"/topics/{k}/" else ""}>{E(v["name"])}</a>' for k, v in c["pillars"].items())
         doc = f"""<!doctype html>
 <html lang="{c['lang']}">
 <head>
@@ -149,26 +185,30 @@ class Site:
 <meta property="og:type" content="{og_type}">
 <meta property="og:url" content="{E(canonical)}">
 <meta property="og:site_name" content="{E(c['name'])}">
-<meta name="theme-color" content="#2f5d50">
+<meta name="theme-color" content="#f6f1ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16120f" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="alternate" type="application/rss+xml" title="{E(c['name'])}" href="/feed.xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/style.css">
 {head_extra}</head>
 <body>
+<a class="skip" href="#main">Seedha article par jaayein</a>
 {banner}<header class="top"><div class="wrap top__in">
-<a class="brand" href="/"><span class="brand__mark" aria-hidden="true"></span><span>{E(c['name'])}</span></a>
+<a class="brand" href="/" aria-label="{E(c['name'])} home"><span class="brand__mark" aria-hidden="true">{LOGO}</span><span class="brand__name">{E(c['name'])}<span class="brand__by">by {E(c['owner'])}</span></span></a>
 <nav class="nav" aria-label="Topics">{nav}</nav>
 </div></header>
-<main>{content}</main>
-<footer class="foot"><div class="wrap">
-<p class="foot__brand"><strong>{E(c['name'])}</strong> by {E(c['owner'])} ({E(c['owner_short'])}), Dehradun.</p>
-<p class="foot__disc">Disclosure: Doon Home Guide {E(c['owner'])} chalata hai, jo {E(c['owner_line'])} hai. Kuch posts mein HDE ke products aur WhatsApp link hote hain. Hum comparisons mein dono taraf ke fayde-nuksaan likhte hain. <a href="/disclosure/">Poori disclosure</a></p>
-<p class="foot__links"><a href="/about/">About</a> · <a href="/blog/">Saare articles</a> · <a href="/contact/">Contact</a> · <a href="/privacy/">Privacy</a> · <a href="/feed.xml">RSS</a></p>
-<p class="foot__small">© {self.today.year} {E(c['owner'])}. {E(c['store_address'])}.</p>
+<main id="main">{content}</main>
+<footer class="foot"><div class="wrap foot__grid">
+<div class="foot__about"><p class="foot__brand">{E(c['name'])}</p>
+<p>Dehradun aur Uttarakhand ke gharon ke liye seedhi salah. {E(c['owner'])} ({E(c['owner_short'])}) ki ek pahal.</p>
+<p class="foot__disc"><strong>Disclosure:</strong> ye site {E(c['owner'])} chalata hai, jo {E(c['owner_line'])} hai. Kuch posts mein HDE ke products aur WhatsApp link hote hain. Comparisons mein hum dono taraf ke fayde-nuksaan likhte hain. <a href="/disclosure/">Poori disclosure</a></p></div>
+<nav class="foot__col" aria-label="Topics"><p class="foot__h">Topics</p>{nav}</nav>
+<div class="foot__col"><p class="foot__h">Showroom</p><p>{E(c['store_address'])}</p><p>{E(c['store_hours'])}</p><a href="{E(c['store_map'])}" target="_blank" rel="noopener" data-track="directions_click" data-label="footer">Google Maps</a><a href="https://wa.me/{c['whatsapp']}" target="_blank" rel="noopener" data-track="whatsapp_click" data-label="footer">{E(c['phone'])}</a></div>
+<div class="foot__base"><span>© {self.today.year} {E(c['owner'])}</span><span><a href="/about/">About</a> · <a href="/contact/">Contact</a> · <a href="/privacy/">Privacy</a> · <a href="/feed.xml">RSS</a></span></div>
 </div></footer>
-<a class="wa-float" href="{E(self.wa('Hi HDE, Doon Home Guide se aaya hoon'))}" data-track="whatsapp_click" data-label="float" target="_blank" rel="noopener" aria-label="WhatsApp HDE">WhatsApp</a>
+<a class="wa-float" href="{E(self.wa('Hi HDE, Doon Home Guide se aaya hoon'))}" data-track="whatsapp_click" data-label="float" target="_blank" rel="noopener" aria-label="WhatsApp par HDE se baat karein">{WA_ICON}<span>WhatsApp</span></a>
 <script src="/assets/site.js" defer></script>
 </body></html>"""
         self.write(path, doc)
@@ -185,9 +225,14 @@ class Site:
 
     def card(self, p, href):
         pil = self.c["pillars"].get(p["pillar"], {"name": p["pillar"]})
-        return (f'<article class="card card--{E(p["pillar"])}"><a href="{href}">'
-                f'<span class="card__tag">{E(pil["name"])}</span><h3>{E(p["title"])}</h3>'
-                f'<p>{E(p["description"])}</p><span class="card__date">{p["date"].strftime("%d %b %Y")}</span></a></article>')
+        img, alt = self.cover(p)
+        pic = f'<span class="card__img"><img src="{img}" alt="" loading="lazy" width="480" height="360"></span>' if img else ""
+        draft = '<span class="badge">Draft</span>' if href.startswith("/preview/") else ""
+        return (f'<article class="card"><a href="{href}">{pic}<span class="card__body">'
+                f'<span class="card__meta"><span class="eyebrow">{E(pil["name"])}</span>{draft}</span>'
+                f'<h3>{E(p.get("social_title") or p["title"])}</h3><p>{E(p["description"])}</p>'
+                f'<span class="card__foot"><time datetime="{p["date"].isoformat()}">{p["date"].strftime("%d %b %Y")}</time> · {self.read_min(p)} min read</span>'
+                f'</span></a></article>')
 
     # ---------- pages ----------
     def post_page(self, p, live):
@@ -197,8 +242,8 @@ class Site:
         pil = c["pillars"].get(p["pillar"], {"name": p["pillar"]})
         toc_html = ""
         if len(toc) >= 3:
-            toc_html = '<nav class="toc" aria-label="Is article mein"><strong>Is article mein</strong><ol>' + "".join(
-                f'<li><a href="#{t["id"]}">{E(html.unescape(t["name"]))}</a></li>' for t in toc) + "</ol></nav>"
+            toc_html = '<details class="toc" open><summary>Is article mein</summary><ol>' + "".join(
+                f'<li><a href="#{t["id"]}">{E(html.unescape(t["name"]))}</a></li>' for t in toc) + "</ol></details>"
         faq = p.get("faq") or []
         faq_html = ""
         if faq:
@@ -222,20 +267,28 @@ class Site:
         banner = ""
         if not live:
             when = p["date"].strftime("%d %b %Y")
-            banner = (f'<div class="draft">DRAFT for review · status: {E(p["status"])} · planned date: {when} · '
-                      f'file: {E(p["file"])}. Ye page Google par nahi dikhta.</div>')
+            banner = (f'<div class="draft" role="status"><strong>Draft for review</strong> · live hoga {when} ko (approve ke baad) · '
+                      f'file: {E(p["file"])} · Google par nahi dikhta</div>')
         updated = ""
         if p["updated"] > p["date"]:
-            updated = f' · Updated {p["updated"].strftime("%d %b %Y")}'
-        content = f"""<article class="post wrap wrap--narrow">
-<p class="crumbs"><a href="/">Home</a> › <a href="/topics/{E(p['pillar'])}/">{E(pil['name'])}</a></p>
+            updated = f'<span>Updated {p["updated"].strftime("%d %b %Y")}</span>'
+        img, alt = self.cover(p)
+        figure = f'<figure class="post__cover"><img src="{img}" alt="{E(alt)}" width="640" height="480"></figure>' if img else ""
+        content = f"""<article class="post">
+<header class="post__head"><div class="wrap post__headin">
+<div class="post__titles"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a><span aria-hidden="true">/</span><a href="/topics/{E(p['pillar'])}/">{E(pil['name'])}</a></nav>
 <h1>{E(p['title'])}</h1>
-<p class="post__meta">{E(c['name'])} team · {p['date'].strftime('%d %b %Y')}{updated} · {max(1, round(len(p['body'].split()) / 200))} min read</p>
-{toc_html}
+<p class="post__lede">{E(p['description'])}</p>
+<p class="post__meta"><span>{E(c['name'])} team</span><time datetime="{p['date'].isoformat()}">{p['date'].strftime('%d %b %Y')}</time>{updated}<span>{self.read_min(p)} min read</span></p></div>
+{figure}</div></header>
+<div class="wrap post__grid">
+<aside class="post__aside">{toc_html}</aside>
+<div class="post__main">
 <div class="prose">{body}</div>
 {faq_html}
 {self.cta_box(p)}
 <p class="post__disc">Ye article {E(c['name'])} ne likha hai, jo {E(c['owner'])} (HDE), Dehradun chalata hai. HDE {E(c['owner_line'])} hai, isliye kuch suggestions HDE ke products ke hain.</p>
+</div></div>
 </article>"""
         seo_title = p.get("seo_title") or f"{p['title']} | {c['name']}"
         self.page(path, seo_title, p["description"], content, noindex=not live, jsonld=jsonld, og_type="article", banner=banner)
@@ -256,48 +309,69 @@ class Site:
         for p in pending:
             self.post_page(p, False)
 
-        # home
-        cards = "".join(self.card(p, f"/{p['slug']}/") for p in live[:9]) or '<p class="empty">Pehla article jald aa raha hai.</p>'
-        pills = "".join(f'<a class="pill" href="/topics/{k}/"><strong>{E(v["name"])}</strong><span>{E(v["blurb"])}</span></a>' for k, v in c["pillars"].items())
-        home = f"""<section class="hero"><div class="wrap">
-<p class="hero__kicker">Dehradun · Mussoorie · Rishikesh · Haridwar</p>
+        # home. Before launch the drafts stand in for articles so the owner can review the whole site.
+        shown = [(p, f"/{p['slug']}/") for p in live]
+        if not c.get("launched"):
+            shown += [(p, f"/preview/{p['slug']}/") for p in pending]
+        empty = '<div class="empty"><p class="empty__h">Pehla article jald aa raha hai</p><p>Har Monday aur Thursday naya article. Tab tak sawal ho to WhatsApp kijiye.</p></div>'
+        feat_html, rest = "", shown
+        if shown:
+            fp, fh = shown[0]
+            fimg, falt = self.cover(fp)
+            fpil = c["pillars"].get(fp["pillar"], {"name": fp["pillar"]})
+            feat_html = (f'<a class="feature" href="{fh}">' + (f'<span class="feature__img"><img src="{fimg}" alt="{E(falt)}" width="640" height="480"></span>' if fimg else "")
+                         + f'<span class="feature__body"><span class="eyebrow">{E(fpil["name"])} · {fp["date"].strftime("%d %b")}</span>'
+                         f'<span class="feature__title">{E(fp.get("social_title") or fp["title"])}</span>'
+                         f'<span class="feature__go">Padhiye <span aria-hidden="true">→</span></span></span></a>')
+            rest = shown[1:]
+        cards = "".join(self.card(p, h) for p, h in rest[:9])
+        upcoming = sorted((d for d in c.get("dates") or [] if dt.date.fromisoformat(str(d["date"])) >= self.today), key=lambda d: str(d["date"]))[:4]
+        dates = "".join(f'<li><time datetime="{d["date"]}">{dt.date.fromisoformat(str(d["date"])).strftime("%d %b")}</time><span>{E(d["what"])}</span></li>' for d in upcoming)
+        ribbon = f'<section class="ribbon" aria-label="Aane wale din"><div class="wrap ribbon__in"><span class="eyebrow">Aane wale din</span><ul>{dates}</ul></div></section>' if dates else ""
+        pills = "".join(f'<a class="pill" href="/topics/{k}/"><span class="pill__n">{i:02d}</span><strong>{E(v["name"])}</strong><span>{E(v["blurb"])}</span></a>' for i, (k, v) in enumerate(c["pillars"].items(), 1))
+        home = f"""<section class="hero"><div class="wrap hero__in">
+<div class="hero__text"><p class="eyebrow">Dehradun · Mussoorie · Rishikesh · Haridwar</p>
 <h1>Doon ke ghar ke liye <em>seedhi, kaam ki</em> salah</h1>
-<p class="hero__lead">{E(c['tagline'])}. Furniture kaise chunein, mausam aur seelan se kaise bachayein, aur kaunsa area aapke liye sahi hai.</p>
-<div class="hero__btns"><a class="btn btn--primary" href="/blog/">Articles padhein</a><a class="btn btn--wa" href="{E(self.wa('Hi HDE, Doon Home Guide se aaya hoon, ghar ke liye salah chahiye'))}" data-track="whatsapp_click" data-label="home_hero" target="_blank" rel="noopener">WhatsApp par poochhein</a></div>
+<p class="hero__lead">Furniture kaise chunein, seelan aur deemak se kaise bachayein, aur shaadi ya griha pravesh ki planning kaise karein. Sab Dehradun ke mausam aur gharon ke hisaab se.</p>
+<div class="hero__btns"><a class="btn btn--solid" href="/blog/">Articles padhein</a><a class="btn btn--wa" href="{E(self.wa('Hi HDE, Doon Home Guide se aaya hoon, ghar ke liye salah chahiye'))}" data-track="whatsapp_click" data-label="home_hero" target="_blank" rel="noopener">{WA_ICON}WhatsApp par poochhein</a></div></div>
+{feat_html}
 </div></section>
-<section class="wrap"><h2 class="sec">Naye articles</h2><div class="grid">{cards}</div></section>
-<section class="wrap"><h2 class="sec">Topics</h2><div class="pills">{pills}</div></section>
-<section class="wrap"><div class="store"><div><h2>Furniture dekh kar lena chahte hain?</h2><p>{E(c['store_name'])}: {E(c['store_address'])}. {E(c['store_hours'])}.</p></div>
-<a class="btn btn--ghost" href="{E(c['store_map'])}" data-track="directions_click" data-label="home" target="_blank" rel="noopener">Google Maps par kholein</a></div></section>"""
+{ribbon}
+<section class="wrap block"><div class="block__head"><h2>Naye articles</h2><a href="/blog/">Saare articles <span aria-hidden="true">→</span></a></div>{f'<div class="grid">{cards}</div>' if cards else ('' if feat_html else empty)}</section>
+<section class="wrap block"><div class="block__head"><h2>Topics</h2></div><div class="pills">{pills}</div></section>
+<section class="wrap block"><div class="store"><div class="store__text"><span class="eyebrow">Showroom</span><h2>Furniture chhookar, baith kar dekhna hai?</h2><p>{E(c['store_name'])}, {E(c['store_address'])}. {E(c['store_hours'])}.</p></div>
+<div class="store__btns"><a class="btn btn--solid" href="{E(c['store_map'])}" data-track="directions_click" data-label="home" target="_blank" rel="noopener">Google Maps par kholein</a><a class="btn btn--line" href="https://wa.me/{c['whatsapp']}" data-track="whatsapp_click" data-label="home_store" target="_blank" rel="noopener">{E(c['phone'])}</a></div></div></section>"""
         site_ld = [{"@context": "https://schema.org", "@type": "WebSite", "name": c["name"], "url": self.base + "/", "inLanguage": c["lang"],
                     "publisher": {"@type": "Organization", "name": c["owner"], "url": c["owner_url"]}}]
         self.page("/", f"{c['name']}: Dehradun home & furniture guide", f"{c['tagline']}. Buying guides, Dehradun local tips, comparisons aur festival planning.", home, jsonld=site_ld)
         urls.append(("/", self.today))
 
         # blog index + topics
-        allc = "".join(self.card(p, f"/{p['slug']}/") for p in live) or '<p class="empty">Pehla article jald aa raha hai.</p>'
-        self.page("/blog/", f"Saare articles | {c['name']}", "Doon Home Guide ke saare articles.", f'<section class="wrap"><h1 class="pagetitle">Saare articles</h1><div class="grid">{allc}</div></section>')
+        allc = "".join(self.card(p, h) for p, h in shown)
+        self.page("/blog/", f"Saare articles | {c['name']}", "Doon Home Guide ke saare articles.",
+                  f'<section class="wrap block"><h1 class="pagetitle">Saare articles</h1><p class="lead">Buying guides, Dehradun local tips, comparisons aur festival planning.</p>{f"<div class=grid>{allc}</div>" if allc else empty}</section>')
         urls.append(("/blog/", self.today))
         for k, v in c["pillars"].items():
             ps = [p for p in live if p["pillar"] == k]
-            cards = "".join(self.card(p, f"/{p['slug']}/") for p in ps) or '<p class="empty">Is topic par articles jald aa rahe hain.</p>'
+            tcards = "".join(self.card(p, h) for p, h in shown if p["pillar"] == k)
+            tempty = '<div class="empty"><p class="empty__h">Is topic par articles jald aa rahe hain</p><p>Tab tak <a href="/blog/">saare articles</a> dekhiye.</p></div>'
             self.page(f"/topics/{k}/", f"{v['name']} | {c['name']}", f"{v['blurb']} Dehradun aur Uttarakhand ke gharon ke liye.",
-                      f'<section class="wrap"><h1 class="pagetitle">{E(v["name"])}</h1><p class="lead">{E(v["blurb"])}</p><div class="grid">{cards}</div></section>',
+                      f'<section class="wrap block"><p class="eyebrow">Topic</p><h1 class="pagetitle">{E(v["name"])}</h1><p class="lead">{E(v["blurb"])}</p>{f"<div class=grid>{tcards}</div>" if tcards else tempty}</section>',
                       noindex=not ps)
             if ps:
                 urls.append((f"/topics/{k}/", max(p["updated"] for p in ps)))
 
         # preview index (for owner review only)
         rows = "".join(f'<tr><td>{p["date"]}</td><td><a href="/preview/{p["slug"]}/">{E(p["title"])}</a></td><td>{E(p["status"])}</td></tr>' for p in pending)
-        self.page("/preview/", "Drafts for review", "Drafts", f'<section class="wrap"><h1 class="pagetitle">Drafts for review</h1><div class="tablewrap"><table><tr><th>Planned</th><th>Title</th><th>Status</th></tr>{rows}</table></div></section>', noindex=True)
+        self.page("/preview/", "Drafts for review", "Drafts", f'<section class="wrap block"><h1 class="pagetitle">Drafts for review</h1><div class="tablewrap"><table><tr><th>Planned</th><th>Title</th><th>Status</th></tr>{rows}</table></div></section>', noindex=True)
 
         # static info pages
         for slug, title, desc, md_text in self.info_pages():
             body = markdown.markdown(md_text, extensions=["sane_lists"])
-            self.page(f"/{slug}/", f"{title} | {c['name']}", desc, f'<section class="wrap wrap--narrow prose"><h1 class="pagetitle">{E(title)}</h1>{body}</section>')
+            self.page(f"/{slug}/", f"{title} | {c['name']}", desc, f'<section class="wrap wrap--narrow block"><h1 class="pagetitle">{E(title)}</h1><div class="prose">{body}</div></section>')
             urls.append((f"/{slug}/", self.today))
 
-        self.page("/404.html", f"Page nahi mila | {c['name']}", "Page nahi mila", '<section class="wrap wrap--narrow"><h1 class="pagetitle">Ye page nahi mila</h1><p><a href="/">Home par jaayein</a> ya <a href="/blog/">saare articles</a> dekhein.</p></section>', noindex=True)
+        self.page("/404.html", f"Page nahi mila | {c['name']}", "Page nahi mila", '<section class="wrap wrap--narrow block"><h1 class="pagetitle">Ye page nahi mila</h1><p><a href="/">Home par jaayein</a> ya <a href="/blog/">saare articles</a> dekhein.</p></section>', noindex=True)
 
         # sitemap, robots, feed
         sm = "".join(f"<url><loc>{E(self.base + u)}</loc><lastmod>{d.isoformat()}</lastmod></url>" for u, d in urls)
