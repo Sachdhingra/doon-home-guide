@@ -31,9 +31,7 @@ ROOT = Path(__file__).resolve().parent
 IST = dt.timezone(dt.timedelta(hours=5, minutes=30))
 E = html.escape
 WA_ICON = ('<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.3-.4.8-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.9 11.9 0 0 0 4.6 4c1.7.7 2.4.8 3.2.7.5-.1 1.5-.6 1.8-1.2.2-.6.2-1.1.1-1.2l-.5-.3Z"/></svg>')
-LOGO = ('<svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path d="M8 19 20 9l12 10v12a1.5 1.5 0 0 1-1.5 1.5h-21A1.5 1.5 0 0 1 8 31Z" fill="currentColor" opacity=".14"/>'
-        '<path d="M5 18 20 6l15 12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>'
-        '<path d="M16.5 32.5v-8h7v8" fill="none" stroke="var(--brass)" stroke-width="2.4" stroke-linejoin="round"/></svg>')
+LOGO = '<img src="/assets/brand/hde-logo-96.png" alt="Home Decor Enterprises logo" width="48" height="48">'
 
 
 def load_posts():
@@ -156,7 +154,7 @@ class Site:
         return body, md.toc_tokens
 
     # ---------- layout ----------
-    def page(self, path, title, desc, content, *, noindex=False, jsonld=None, og_type="website", banner=""):
+    def page(self, path, title, desc, content, *, noindex=False, jsonld=None, og_type="website", banner="", og_image="/assets/brand/hde-logo-512.png"):
         c = self.c
         canonical = self.base + path
         noindex = noindex or not c.get("launched")
@@ -187,7 +185,9 @@ class Site:
 <meta property="og:site_name" content="{E(c['name'])}">
 <meta name="theme-color" content="#f6f1ea" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#16120f" media="(prefers-color-scheme: dark)">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:image" content="{E(self.base + og_image)}">
 <link rel="alternate" type="application/rss+xml" title="{E(c['name'])}" href="/feed.xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
@@ -196,12 +196,12 @@ class Site:
 <body>
 <a class="skip" href="#main">Seedha article par jaayein</a>
 {banner}<header class="top"><div class="wrap top__in">
-<a class="brand" href="/" aria-label="{E(c['name'])} home"><span class="brand__mark" aria-hidden="true">{LOGO}</span><span class="brand__name">{E(c['name'])}<span class="brand__by">by {E(c['owner'])}</span></span></a>
+<a class="brand" href="/" aria-label="{E(c['name'])} home"><span class="brand__mark">{LOGO}</span><span class="brand__name">{E(c['name'])}<span class="brand__by">by {E(c['owner'])}</span></span></a>
 <nav class="nav" aria-label="Topics">{nav}</nav>
 </div></header>
 <main id="main">{content}</main>
 <footer class="foot"><div class="wrap foot__grid">
-<div class="foot__about"><p class="foot__brand">{E(c['name'])}</p>
+<div class="foot__about"><div class="foot__logo">{LOGO.replace('hde-logo-96', 'hde-logo-192').replace('width="48" height="48"', 'width="72" height="72"')}<p class="foot__brand">{E(c['name'])}<span>by {E(c['owner'])} · since 2006</span></p></div>
 <p>Dehradun aur Uttarakhand ke gharon ke liye seedhi salah. {E(c['owner'])} ({E(c['owner_short'])}) ki ek pahal.</p>
 <p class="foot__disc"><strong>Disclosure:</strong> ye site {E(c['owner'])} chalata hai, jo {E(c['owner_line'])} hai. Kuch posts mein HDE ke products aur WhatsApp link hote hain. Comparisons mein hum dono taraf ke fayde-nuksaan likhte hain. <a href="/disclosure/">Poori disclosure</a></p></div>
 <nav class="foot__col" aria-label="Topics"><p class="foot__h">Topics</p>{nav}</nav>
@@ -291,7 +291,8 @@ class Site:
 </div></div>
 </article>"""
         seo_title = p.get("seo_title") or f"{p['title']} | {c['name']}"
-        self.page(path, seo_title, p["description"], content, noindex=not live, jsonld=jsonld, og_type="article", banner=banner)
+        card_img = f"/social/{p['slug']}.jpg" if (ROOT / "static/social" / f"{p['slug']}.jpg").exists() else "/assets/brand/hde-logo-512.png"
+        self.page(path, seo_title, p["description"], content, noindex=not live, jsonld=jsonld, og_type="article", banner=banner, og_image=card_img)
         return path
 
     def build(self, posts):

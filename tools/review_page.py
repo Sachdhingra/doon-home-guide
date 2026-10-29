@@ -24,6 +24,7 @@ site.product_card = card
 
 posts = sorted([p for p in build.load_posts() if p["status"] != "approved"], key=lambda p: p["date"])
 css = (ROOT / "static/assets/style.css").read_text(encoding="utf-8")
+LOGO64 = base64.b64encode((ROOT / "static/assets/brand/hde-logo-192.png").read_bytes()).decode()
 nav, arts = [], []
 for i, p in enumerate(posts, 1):
     body, _ = site.render_body(p)
@@ -44,7 +45,7 @@ page = f"""<title>Doon Home Guide Drafts</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap">
 <style>{css}
 :root{{color-scheme:light}}
-.top{{position:static}}.reviewhead{{background:var(--green);color:#fff;padding-block:28px}}
+.top{{position:static}}.reviewhead{{background:#5e3116;color:#fff;padding-block:28px}}
 .reviewhead h1{{color:#fff;margin:0 0 6px;font-size:30px}}.reviewhead p{{margin:0;opacity:.9;max-width:62ch}}
 .drafts{{display:grid;gap:8px;margin-top:18px}}.drafts a{{color:#fff;text-decoration:none;display:flex;gap:12px;padding:10px 14px;border:1px solid rgba(255,255,255,.25);border-radius:10px}}
 .drafts a span{{color:var(--gold);min-width:92px;font-variant-numeric:tabular-nums}}
@@ -52,6 +53,7 @@ page = f"""<title>Doon Home Guide Drafts</title>
 .ig{{background:var(--paper);border:1px dashed var(--line);border-radius:12px;padding:14px 18px;margin:20px 0;font-size:15px}}
 </style>
 <header class="reviewhead"><div class="wrap wrap--narrow">
+<img src="data:image/png;base64,{LOGO64}" alt="Home Decor Enterprises logo" width="72" height="72" style="margin-bottom:14px">
 <h1>Doon Home Guide: drafts for review</h1>
 <p>Har draft padhiye aur thread mein "approve" likhiye ya jo badalna hai bataiye. Approve karne par post apni date par subah 6:15 baje live hoga aur usi din Instagram teaser jaayega. Product cards aur WhatsApp button live site par HDE se link honge.</p>
 <nav class="drafts">{''.join(nav)}</nav></div></header>
