@@ -16,7 +16,7 @@ store_map: https://maps.google.com/maps?cid=1477870679173429280
 store_hours: Open every day, 11 AM to 8 PM
 
 # false = preview phase: every page is noindex and robots.txt blocks crawlers.
-# Set true only once uttarakhandhomes.in points to Netlify.
+# Set true only once uttarakhandhomes.in points to GitHub Pages and the DNS check passes.
 launched: false
 
 # Fill these in when Google accounts are ready. Empty = not added to pages.
