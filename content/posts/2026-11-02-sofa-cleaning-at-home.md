@@ -4,7 +4,7 @@ seo_title: "How to Clean Sofa at Home Before Diwali (Fabric, Leatherette, Stains
 social_title: "Diwali se pehle sofa ghar par kaise saaf karein"
 slug: how-to-clean-sofa-at-home
 date: 2026-11-02
-status: review
+status: approved
 pillar: home-tips
 keyword: how to clean sofa at home
 description: "Fabric, leatherette aur velvet sofa ko ghar par step-by-step saaf karne ka tareeka, chai-tel-syahi ke daag hatane ke nuskhe, aur kab sofa badalna behtar hai."
