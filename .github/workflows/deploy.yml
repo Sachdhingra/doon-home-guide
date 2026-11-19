@@ -44,3 +44,13 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # Rebuilds the Vercel copy too, so scheduled posts go live there each morning.
+  # Needs a repo secret VERCEL_DEPLOY_HOOK (Vercel > Project > Settings > Git > Deploy Hooks); skipped without it.
+  vercel:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'push'
+    steps:
+      - env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: if [ -n "$HOOK" ]; then curl -fsS -X POST "$HOOK"; else echo "No VERCEL_DEPLOY_HOOK secret, skipping"; fi

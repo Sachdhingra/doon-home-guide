@@ -76,3 +76,12 @@ python3 build.py --today 2026-11-13    # see what is live on a given day
 Every page footer and every post end says the site is run by HDE, an authorised
 Godrej Interio channel partner. HDE links carry `rel="sponsored"` and UTM tags
 (`utm_source=doonhomeguide&utm_medium=blog&utm_campaign=<slug>`).
+
+## Vercel (second copy of the site)
+
+`vercel.json` + `tools/vercel-build.sh` let Vercel build the same site.
+
+1. vercel.com > Add New > Project > import `Sachdhingra/doon-home-guide` > Deploy (no settings to change).
+2. Every push to main redeploys automatically.
+3. For scheduled posts to appear each morning: Vercel > Project > Settings > Git > Deploy Hooks > create one for `main`, copy the URL, and add it in GitHub > repo Settings > Secrets and variables > Actions as `VERCEL_DEPLOY_HOOK`. The daily GitHub workflow then pings it.
+4. Optional: set env var `SITE_URL` in Vercel if you attach a custom domain there.
