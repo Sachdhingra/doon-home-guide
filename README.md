@@ -83,5 +83,5 @@ Godrej Interio channel partner. HDE links carry `rel="sponsored"` and UTM tags
 
 1. vercel.com > Add New > Project > import `Sachdhingra/doon-home-guide` > Deploy (no settings to change).
 2. Every push to main redeploys automatically.
-3. For scheduled posts to appear each morning: Vercel > Project > Settings > Git > Deploy Hooks > create one for `main`, copy the URL, and add it in GitHub > repo Settings > Secrets and variables > Actions as `VERCEL_DEPLOY_HOOK`. The daily GitHub workflow then pings it.
+3. Scheduled posts: the daily GitHub workflow updates `data/live-posts.txt` when a post's date arrives and pushes it, which makes Vercel redeploy. No setup needed.
 4. Optional: set env var `SITE_URL` in Vercel if you attach a custom domain there.

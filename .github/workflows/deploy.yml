@@ -45,12 +45,25 @@ jobs:
       - id: deployment
         uses: actions/deploy-pages@v4
 
-  # Rebuilds the Vercel copy too, so scheduled posts go live there each morning.
-  # Needs a repo secret VERCEL_DEPLOY_HOOK (Vercel > Project > Settings > Git > Deploy Hooks); skipped without it.
+  # Vercel redeploys on every push to main. On the daily run, when a post's date
+  # arrives, this commits the new list of live posts so Vercel publishes it too.
   vercel:
     runs-on: ubuntu-latest
     if: github.event_name != 'push'
+    permissions:
+      contents: write
     steps:
-      - env:
-          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
-        run: if [ -n "$HOOK" ]; then curl -fsS -X POST "$HOOK"; else echo "No VERCEL_DEPLOY_HOOK secret, skipping"; fi
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: |
+          python3 build.py --out /tmp/site > /dev/null
+          python3 -c "import json; print(*json.load(open('/tmp/site/build.json'))['live'], sep=chr(10))" > data/live-posts.txt
+          if git diff --quiet -- data/live-posts.txt; then echo "No new posts today"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/live-posts.txt
+          git commit -m "Publish posts due $(TZ=Asia/Kolkata date +%F)"
+          git push
